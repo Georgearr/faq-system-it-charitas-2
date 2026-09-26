@@ -397,10 +397,13 @@ export class MockAdapter implements AppAdapter {
   }
 
   // Authentication
+  // Simple password storage for mock (in production, use proper hashing)
+  private userPasswords: Map<string, string> = new Map();
+
   async registerWithEmail(
     fullName: string,
     email: string,
-    _password: string,
+    password: string,
     department: string
   ): Promise<{ challengeId: string; email: string }> {
     const existing = this.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
@@ -429,6 +432,8 @@ export class MockAdapter implements AppAdapter {
     };
 
     this.users.push(newUser);
+    // Store password for mock authentication
+    this.userPasswords.set(userId, password);
 
     const challengeId = `ch_email_${Date.now()}`;
     this.challenges.set(challengeId, {
@@ -449,9 +454,15 @@ export class MockAdapter implements AppAdapter {
     return { challengeId, email };
   }
 
-  async loginWithEmail(email: string, _password: string): Promise<AuthResponse> {
+  async loginWithEmail(email: string, password: string): Promise<AuthResponse> {
     const user = this.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
     if (!user) {
+      throw new Error('Invalid email or password.');
+    }
+
+    // Check password for mock
+    const storedPassword = this.userPasswords.get(user.userId);
+    if (storedPassword !== password) {
       throw new Error('Invalid email or password.');
     }
 

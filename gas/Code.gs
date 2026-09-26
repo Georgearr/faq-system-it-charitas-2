@@ -190,6 +190,31 @@ function isExpired(isoString) {
 
 /**
  * Simple password hash using SHA-256 via Utilities.
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PRODUCTION BLOCKER: Insecure Password Hashing
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * SECURITY ISSUE: SHA-256 is a fast cryptographic hash, NOT suitable for password storage.
+ * It is vulnerable to brute-force and rainbow table attacks.
+ *
+ * PRODUCTION REQUIREMENT: Use a proper password hashing algorithm:
+ * - bcrypt (via external library or custom implementation)
+ * - scrypt
+ * - Argon2
+ * - PBKDF2 with high iteration count (100,000+)
+ * 
+ * Google Apps Script limitations: No native bcrypt/scrypt/Argon2.
+ * Workarounds:
+ * 1. Use Utilities.computeHmacSha256 with a secret key + high iteration loop (PBKDF2-like)
+ * 2. Call external hashing service via UrlFetchApp (not recommended for secrets)
+ * 3. Implement PBKDF2 manually using Utilities.computeHmacSha256 in a loop
+ * 4. Use a dedicated auth service (Firebase Auth, Auth0, etc.) instead of custom auth
+ * 
+ * Until proper password hashing is implemented, this system is NOT production-ready
+ * for handling real user credentials.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
  * In production, use a stronger algorithm if available.
  */
 function hashPassword(password) {
@@ -488,9 +513,32 @@ function loginWithPhone(phoneNumber, password) {
 }
 
 function loginWithGoogle(credentialOrIdToken) {
-  // In production, verify the Google ID token using Google's tokeninfo endpoint
-  // For now, we trust the sub from the decoded token payload
-  // The frontend should send the decoded sub (Google user ID)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRODUCTION BLOCKER: Google OAuth ID Token Validation Required
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 
+  // SECURITY ISSUE: This function currently TRUSTS the `credentialOrIdToken` parameter
+  // as a raw Google Subject (sub) identifier without cryptographic verification.
+  //
+  // PRODUCTION REQUIREMENT: Must validate the Google ID Token before trusting it:
+  // 
+  // 1. Frontend (React) obtains ID Token via Google Identity Services (GIS)
+  // 2. Frontend sends ID Token to this function via google.script.run
+  // 3. Backend MUST verify the ID Token by calling Google's tokeninfo endpoint:
+  //    UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + idToken)
+  // 4. Validate the response:
+  //    - aud (audience) matches your GOOGLE_CLIENT_ID (from Script Properties)
+  //    - iss (issuer) is 'accounts.google.com' or 'https://accounts.google.com'
+  //    - exp (expiration) is in the future
+  //    - Extract verified 'sub' (subject/user ID) from the validated response
+  // 5. Only then use the verified 'sub' to find/create user
+  //
+  // See: https://developers.google.com/identity/gsi/web/guides/verify-google-id-token
+  //
+  // Until this is implemented, Google Sign-In is INSECURE and should not be used in production.
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Current mock implementation: treats credentialOrIdToken as the googleSub directly
   var googleSub = credentialOrIdToken;
 
   var users = readSheet(SHEET_NAMES.USERS);
