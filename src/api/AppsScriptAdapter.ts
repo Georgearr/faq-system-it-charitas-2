@@ -39,6 +39,12 @@ declare global {
   }
 }
 
+/**
+ * AppsScriptAdapter wraps google.script.run calls.
+ *
+ * IMPORTANT: google.script.run functions are called with positional arguments.
+ * The argument order must match the GAS function signatures in Code.gs exactly.
+ */
 export class AppsScriptAdapter implements AppAdapter {
   private isGASAvailable(): boolean {
     return (
@@ -54,7 +60,7 @@ export class AppsScriptAdapter implements AppAdapter {
       if (!this.isGASAvailable()) {
         reject(
           new Error(
-            `Google Apps Script environment is not available. (Attempted to call '${functionName}')`
+            `Google Apps Script environment not available. (Called: '${functionName}')`
           )
         );
         return;
@@ -65,7 +71,7 @@ export class AppsScriptAdapter implements AppAdapter {
 
       if (typeof targetFn !== 'function') {
         reject(
-          new Error(`Google Apps Script function '${functionName}' is not defined on google.script.run`)
+          new Error(`GAS function '${functionName}' is not defined on google.script.run`)
         );
         return;
       }
@@ -77,6 +83,8 @@ export class AppsScriptAdapter implements AppAdapter {
       (targetFn as GASFunction)(...args);
     });
   }
+
+  // ─── Runtime ───────────────────────────────────────────────────────────────
 
   async testRuntime(): Promise<RuntimeInfo> {
     if (!this.isGASAvailable()) {
@@ -90,18 +98,19 @@ export class AppsScriptAdapter implements AppAdapter {
     return this.callGAS<RuntimeInfo>('testRuntime');
   }
 
-  // Authentication
+  // ─── Authentication ────────────────────────────────────────────────────────
+
   async registerWithEmail(
     fullName: string,
     email: string,
     password: string,
     department: string
   ): Promise<{ challengeId: string; email: string }> {
-    return this.callGAS('registerWithEmail', { fullName, email, password, department });
+    return this.callGAS('registerWithEmail', fullName, email, password, department);
   }
 
   async loginWithEmail(email: string, password: string): Promise<AuthResponse> {
-    return this.callGAS('loginWithEmail', { email, password });
+    return this.callGAS('loginWithEmail', email, password);
   }
 
   async registerWithPhone(
@@ -110,11 +119,14 @@ export class AppsScriptAdapter implements AppAdapter {
     password: string,
     department: string
   ): Promise<{ challengeId: string; phone: string }> {
-    return this.callGAS('registerWithPhone', { fullName, phoneNumber, password, department });
+    return this.callGAS('registerWithPhone', fullName, phoneNumber, password, department);
   }
 
-  async loginWithPhone(phoneNumber: string, password?: string): Promise<{ challengeId?: string; auth?: AuthResponse }> {
-    return this.callGAS('loginWithPhone', { phoneNumber, password });
+  async loginWithPhone(
+    phoneNumber: string,
+    password?: string
+  ): Promise<{ challengeId?: string; auth?: AuthResponse }> {
+    return this.callGAS('loginWithPhone', phoneNumber, password ?? null);
   }
 
   async loginWithGoogle(credentialOrIdToken: string): Promise<AuthResponse> {
@@ -122,11 +134,11 @@ export class AppsScriptAdapter implements AppAdapter {
   }
 
   async verifyEmail(challengeId: string, code: string): Promise<AuthResponse> {
-    return this.callGAS('verifyEmail', { challengeId, code });
+    return this.callGAS('verifyEmail', challengeId, code);
   }
 
   async verifyPhone(challengeId: string, code: string): Promise<AuthResponse> {
-    return this.callGAS('verifyPhone', { challengeId, code });
+    return this.callGAS('verifyPhone', challengeId, code);
   }
 
   async resendVerification(challengeId: string): Promise<{ success: boolean; message: string }> {
@@ -137,8 +149,12 @@ export class AppsScriptAdapter implements AppAdapter {
     return this.callGAS('requestPasswordReset', emailOrPhone);
   }
 
-  async resetPassword(challengeId: string, code: string, newPassword: string): Promise<{ success: boolean }> {
-    return this.callGAS('resetPassword', { challengeId, code, newPassword });
+  async resetPassword(
+    challengeId: string,
+    code: string,
+    newPassword: string
+  ): Promise<{ success: boolean }> {
+    return this.callGAS('resetPassword', challengeId, code, newPassword);
   }
 
   async getCurrentUser(): Promise<User | null> {
@@ -152,9 +168,10 @@ export class AppsScriptAdapter implements AppAdapter {
     }
   }
 
-  // FAQ
+  // ─── FAQ ───────────────────────────────────────────────────────────────────
+
   async getFAQs(categoryId?: string, search?: string): Promise<FAQ[]> {
-    return this.callGAS('getFAQs', categoryId, search);
+    return this.callGAS('getFAQs', categoryId ?? null, search ?? null);
   }
 
   async getFAQ(id: string): Promise<FAQ | null> {
@@ -169,7 +186,9 @@ export class AppsScriptAdapter implements AppAdapter {
     return this.callGAS('getFAQCategories');
   }
 
-  async createFAQ(data: Omit<FAQ, 'faqId' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'>): Promise<FAQ> {
+  async createFAQ(
+    data: Omit<FAQ, 'faqId' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'>
+  ): Promise<FAQ> {
     return this.callGAS('createFAQ', data);
   }
 
@@ -181,21 +200,25 @@ export class AppsScriptAdapter implements AppAdapter {
     return this.callGAS('deleteFAQ', id);
   }
 
-  async submitFAQFeedback(id: string, isHelpful: boolean): Promise<{ helpfulCount: number; unhelpfulCount: number }> {
+  async submitFAQFeedback(
+    id: string,
+    isHelpful: boolean
+  ): Promise<{ helpfulCount: number; unhelpfulCount: number }> {
     return this.callGAS('submitFAQFeedback', id, isHelpful);
   }
 
-  // Issues
+  // ─── Issues ────────────────────────────────────────────────────────────────
+
   async createIssue(request: CreateIssueRequest): Promise<Issue> {
     return this.callGAS('createIssue', request);
   }
 
   async getIssue(id: string, guestToken?: string): Promise<Issue | null> {
-    return this.callGAS('getIssue', id, guestToken);
+    return this.callGAS('getIssue', id, guestToken ?? null);
   }
 
   async getIssues(query?: IssueQuery): Promise<Issue[]> {
-    return this.callGAS('getIssues', query);
+    return this.callGAS('getIssues', query ?? null);
   }
 
   async getMyIssues(): Promise<Issue[]> {
@@ -227,10 +250,11 @@ export class AppsScriptAdapter implements AppAdapter {
   }
 
   async getIssueReplies(issueId: string, guestToken?: string): Promise<IssueReply[]> {
-    return this.callGAS('getIssueReplies', issueId, guestToken);
+    return this.callGAS('getIssueReplies', issueId, guestToken ?? null);
   }
 
-  // Dashboards
+  // ─── Dashboards ────────────────────────────────────────────────────────────
+
   async getUserDashboard(): Promise<UserDashboardData> {
     return this.callGAS('getUserDashboard');
   }
@@ -243,9 +267,12 @@ export class AppsScriptAdapter implements AppAdapter {
     return this.callGAS('getAdminDashboard');
   }
 
-  // Users Management
-  async getUsers(query?: { search?: string; role?: UserRole; status?: UserStatus }): Promise<User[]> {
-    return this.callGAS('getUsers', query);
+  // ─── Users Management ──────────────────────────────────────────────────────
+
+  async getUsers(
+    query?: { search?: string; role?: UserRole; status?: UserStatus }
+  ): Promise<User[]> {
+    return this.callGAS('getUsers', query ?? null);
   }
 
   async getUser(userId: string): Promise<User | null> {
@@ -264,7 +291,8 @@ export class AppsScriptAdapter implements AppAdapter {
     return this.callGAS('updateUserStatus', userId, status);
   }
 
-  // Notifications
+  // ─── Notifications ─────────────────────────────────────────────────────────
+
   async getNotifications(): Promise<Notification[]> {
     return this.callGAS('getNotifications');
   }
@@ -277,8 +305,11 @@ export class AppsScriptAdapter implements AppAdapter {
     return this.callGAS('markAllNotificationsRead');
   }
 
-  // Audit Logs
-  async getAuditLogs(query?: { action?: string; actorId?: string; entityType?: string }): Promise<AuditLog[]> {
-    return this.callGAS('getAuditLogs', query);
+  // ─── Audit Logs ────────────────────────────────────────────────────────────
+
+  async getAuditLogs(
+    query?: { action?: string; actorId?: string; entityType?: string }
+  ): Promise<AuditLog[]> {
+    return this.callGAS('getAuditLogs', query ?? null);
   }
 }
